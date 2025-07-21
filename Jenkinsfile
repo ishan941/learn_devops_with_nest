@@ -11,7 +11,7 @@ pipeline {
     NODE_CACHE = '/root/.npm'
     SLACK_WEBHOOK = credentials('slack-webhook')
     GITHUB_TOKEN = credentials('github-pat')
-    REPO = 'ishan941/learn_devops_with_nest' 
+    REPO = 'ishan941/learn_devops_with_nest'
   }
 
   options {
@@ -76,26 +76,23 @@ pipeline {
     stage('Auto Merge PR') {
       when {
         allOf {
-          changeRequest(target: 'main')   // Only PRs targeting 'main' branch
+          changeRequest(target: 'main')
           expression { currentBuild.currentResult == 'SUCCESS' }
         }
       }
       steps {
         script {
-          // DEBUG: Print environment variables for troubleshooting
           echo "🔁 CHANGE_ID (PR number) = ${env.CHANGE_ID}"
           echo "🔁 REPO = ${REPO}"
           if (!env.CHANGE_ID) {
             error("❌ CHANGE_ID not found. Make sure this job is triggered by a Pull Request.")
           }
 
-          // Prepare JSON payload for merge
           def mergePayload = """{
             "commit_title": "✅ Auto-merged by Jenkins",
             "merge_method": "merge"
           }"""
 
-          // Call GitHub API to merge the PR
           def response = sh(
             script: """
               curl -s -w "\\n%{http_code}" -X PUT \
@@ -107,7 +104,6 @@ pipeline {
             returnStdout: true
           ).trim()
 
-          // Parse response and status code
           def (body, statusCode) = response.tokenize('\n')[-2..-1]
 
           echo "GitHub API response code: ${statusCode}"
@@ -122,9 +118,9 @@ pipeline {
       }
     }
   }
+
   post {
-  success {
-    node {
+    success {
       script {
         def author = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
         def message = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
@@ -153,10 +149,8 @@ pipeline {
         sh "curl -X POST -H 'Content-type: application/json' --data @slack-success.json '${SLACK_WEBHOOK}'"
       }
     }
-  }
 
-  failure {
-    node {
+    failure {
       script {
         def time = sh(script: "date '+%Y-%m-%d %H:%M:%S'", returnStdout: true).trim()
         def payload = """
@@ -181,6 +175,4 @@ pipeline {
       }
     }
   }
-}
-
 }
