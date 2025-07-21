@@ -21,7 +21,7 @@ pipeline {
 
     stage('Install') {
       steps {
-        dir("${env.WORKSPACE}") {
+        dir("${env.WORKSPACE}/learnnest-student-crud") {
           sh 'npm ci'
         }
       }
@@ -35,7 +35,9 @@ pipeline {
         }
       }
       steps {
-        sh 'npm run lint || true'
+        dir("${env.WORKSPACE}/learnnest-student-crud") {
+          sh 'npm run lint || true'
+        }
       }
     }
 
@@ -47,11 +49,13 @@ pipeline {
         }
       }
       steps {
-        sh 'npm run test -- --passWithNoTests'
+        dir("${env.WORKSPACE}/learnnest-student-crud") {
+          sh 'npm run test -- --passWithNoTests'
+        }
       }
       post {
         always {
-          junit '**/test-results/**/*.xml'
+          junit 'learnnest-student-crud/test-results/**/*.xml'
         }
       }
     }
@@ -61,8 +65,10 @@ pipeline {
         branch 'main'
       }
       steps {
-        sh 'npm run build'
-        archiveArtifacts artifacts: 'dist/**', fingerprint: true
+        dir("${env.WORKSPACE}/learnnest-student-crud") {
+          sh 'npm run build'
+        }
+        archiveArtifacts artifacts: 'learnnest-student-crud/dist/**', fingerprint: true
       }
     }
 
@@ -90,10 +96,9 @@ pipeline {
     failure {
       script {
         sh (
-        script: "curl -X POST -H 'Content-type: application/json' --data '{\"text\": \"❌ *Build Failed* on branch \\`${env.BRANCH_NAME}\\`\\n🔗         <${env.BUILD_URL}|View Build Log>\"}' ${SLACK_WEBHOOK}",
+        script: "curl -X POST -H 'Content-type: application/json' --data '{\"text\": \"❌ *Build Failed* on branch \\`${env.BRANCH_NAME}\\`\\n🔗 <${env.BUILD_URL}|View Build Log>\"}' ${SLACK_WEBHOOK}",
         returnStdout: true
         )
-
       }
     }
   }
