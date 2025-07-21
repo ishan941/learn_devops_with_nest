@@ -2,14 +2,14 @@ pipeline {
   agent {
     docker {
       image 'node:18'
-      args '-u root'
+      args '-u root'  // run as root to avoid permission issues
     }
   }
 
   environment {
-    BRANCH_NAME = "${env.GIT_BRANCH ?: env.BRANCH_NAME}"
-    NODE_CACHE = '/root/.npm'
-    SLACK_WEBHOOK = credentials('slack-webhook')
+    BRANCH_NAME = "${env.GIT_BRANCH ?: env.BRANCH_NAME}"  // fallback for branch
+    NODE_CACHE = '/root/.npm'  // npm cache
+    SLACK_WEBHOOK = credentials('slack-webhook') 
   }
 
   options {
@@ -83,66 +83,22 @@ pipeline {
     }
   }
 
-   post {
+  post {
     success {
       script {
-        def time = new Date().format("yyyy-MM-dd HH:mm:ss", TimeZone.getTimeZone("Asia/Kathmandu"))
-        def commitMessage = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
-        def author = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
-        def branch = env.BRANCH_NAME
-
-        def slackMessage = [
-          text: "✅ *Build Succeeded*",
-          attachments: [
-            [
-              color: "good",
-              fields: [
-                [title: "Job", value: env.JOB_NAME, short: true],
-                [title: "Build", value: "#${env.BUILD_NUMBER}", short: true],
-                [title: "Branch", value: branch, short: true],
-                [title: "Commit Author", value: author, short: true],
-                [title: "Commit Message", value: commitMessage, short: false],
-                [title: "Time", value: time, short: true],
-                [title: "View Logs", value: "<${env.BUILD_URL}|Click to View>", short: false]
-              ]
-            ]
-          ]
-        ]
-
-        def payloadJson = JsonOutput.toJson(slackMessage)
-        writeFile file: 'slack-success.json', text: payloadJson
-        sh "curl -X POST -H 'Content-type: application/json' --data @slack-success.json ${SLACK_WEBHOOK}"
+        sh """
+          curl -X POST -H 'Content-type: application/json' \
+          --data '{"text": "✅ *Build Succeeded* on branch `${env.BRANCH_NAME}`\\n🔗 <${env.BUILD_URL}|View Build Log>"}' \
+          ${SLACK_WEBHOOK}
+        """
       }
     }
-
     failure {
       script {
-        def time = new Date().format("yyyy-MM-dd HH:mm:ss", TimeZone.getTimeZone("Asia/Kathmandu"))
-        def commitMessage = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
-        def author = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
-        def branch = env.BRANCH_NAME
-
-        def slackMessage = [
-          text: "❌ *Build Failed*",
-          attachments: [
-            [
-              color: "danger",
-              fields: [
-                [title: "Job", value: env.JOB_NAME, short: true],
-                [title: "Build", value: "#${env.BUILD_NUMBER}", short: true],
-                [title: "Branch", value: branch, short: true],
-                [title: "Commit Author", value: author, short: true],
-                [title: "Commit Message", value: commitMessage, short: false],
-                [title: "Time", value: time, short: true],
-                [title: "View Logs", value: "<${env.BUILD_URL}|Click to View>", short: false]
-              ]
-            ]
-          ]
-        ]
-
-        def payloadJson = JsonOutput.toJson(slackMessage)
-        writeFile file: 'slack-failure.json', text: payloadJson
-        sh "curl -X POST -H 'Content-type: application/json' --data @slack-failure.json ${SLACK_WEBHOOK}"
+        sh (
+        script: "curl -X POST -H 'Content-type: application/json' --data '{\"text\": \"❌ *Build Failed* on branch \\`${env.BRANCH_NAME}\\`\\n🔗 <${env.BUILD_URL}|View Build Log>\"}' ${SLACK_WEBHOOK}",
+        returnStdout: true
+        )
       }
     }
   }
