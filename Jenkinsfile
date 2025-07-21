@@ -154,7 +154,6 @@ pipeline {
       }
     }
   }
-
   failure {
     node {
       script {
