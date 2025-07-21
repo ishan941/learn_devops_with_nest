@@ -82,63 +82,62 @@ pipeline {
     }
   }
 
-  post {
-    success {
-      script {
-        def timestamp = new Date().format("yyyy-MM-dd HH:mm:ss", TimeZone.getTimeZone("Asia/Kathmandu"))
-        def gitCommitMessage = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
-        def gitAuthor = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
+ post {
+  success {
+    script {
+      def timestamp = new Date().format("yyyy-MM-dd HH:mm:ss", TimeZone.getTimeZone("Asia/Kathmandu"))
+      def gitCommitMessage = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
+      def gitAuthor = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
+      def branchName = env.BRANCH_NAME
 
-        def message = """
-        {
-          "text": "✅ *Build Succeeded*",
-          "attachments": [
-            {
-              "color": "good",
-              "fields": [
-                { "title": "Job", "value": "${env.JOB_NAME}", "short": true },
-                { "title": "Build", "value": "#${env.BUILD_NUMBER}", "short": true },
-                { "title": "Branch", "value": "`" + "${env.BRANCH_NAME}" + "`", "short": true },
-                { "title": "Commit Author", "value": "${gitAuthor}", "short": true },
-                { "title": "Commit Message", "value": "${gitCommitMessage}", "short": false },
-                { "title": "Time", "value": "${timestamp}", "short": true },
-                { "title": "View Logs", "value": "<${env.BUILD_URL}|Click to View>", "short": false }
-              ]
-            }
+      def slackPayload = [
+        text: "✅ *Build Succeeded*",
+        attachments: [[
+          color : "good",
+          fields: [
+            [ title: "Job", value: env.JOB_NAME, short: true ],
+            [ title: "Build", value: "#${env.BUILD_NUMBER}", short: true ],
+            [ title: "Branch", value: "`$branchName`", short: true ],
+            [ title: "Commit Author", value: gitAuthor, short: true ],
+            [ title: "Commit Message", value: gitCommitMessage, short: false ],
+            [ title: "Time", value: timestamp, short: true ],
+            [ title: "View Logs", value: "<${env.BUILD_URL}|Click to View>", short: false ]
           ]
-        }
-        """
-        sh "curl -X POST -H 'Content-type: application/json' --data '${message.trim()}' ${SLACK_WEBHOOK}"
-      }
-    }
+        ]]
+      ]
 
-    failure {
-      script {
-        def timestamp = new Date().format("yyyy-MM-dd HH:mm:ss", TimeZone.getTimeZone("Asia/Kathmandu"))
-        def gitCommitMessage = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
-        def gitAuthor = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
-
-        def message = """
-        {
-          "text": "❌ *Build Failed*",
-          "attachments": [
-            {
-              "color": "danger",
-              "fields": [
-                { "title": "Job", "value": "${env.JOB_NAME}", "short": true },
-                { "title": "Build", "value": "#${env.BUILD_NUMBER}", "short": true },
-                { "title": "Branch", "value": "`" + "${env.BRANCH_NAME}" + "`", "short": true },
-                { "title": "Commit Author", "value": "${gitAuthor}", "short": true },
-                { "title": "Commit Message", "value": "${gitCommitMessage}", "short": false },
-                { "title": "Time", "value": "${timestamp}", "short": true },
-                { "title": "View Logs", "value": "<${env.BUILD_URL}|Click to View>", "short": false }
-              ]
-            }
-          ]
-        }
-        """
-        sh "curl -X POST -H 'Content-type: application/json' --data '${message.trim()}' ${SLACK_WEBHOOK}"
-      }
+      writeJSON file: 'slack-success.json', json: slackPayload
+      sh "curl -X POST -H 'Content-type: application/json' --data @slack-success.json ${SLACK_WEBHOOK}"
     }
   }
+
+  failure {
+    script {
+      def timestamp = new Date().format("yyyy-MM-dd HH:mm:ss", TimeZone.getTimeZone("Asia/Kathmandu"))
+      def gitCommitMessage = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
+      def gitAuthor = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
+      def branchName = env.BRANCH_NAME
+
+      def slackPayload = [
+        text: "❌ *Build Failed*",
+        attachments: [[
+          color : "danger",
+          fields: [
+            [ title: "Job", value: env.JOB_NAME, short: true ],
+            [ title: "Build", value: "#${env.BUILD_NUMBER}", short: true ],
+            [ title: "Branch", value: "`$branchName`", short: true ],
+            [ title: "Commit Author", value: gitAuthor, short: true ],
+            [ title: "Commit Message", value: gitCommitMessage, short: false ],
+            [ title: "Time", value: timestamp, short: true ],
+            [ title: "View Logs", value: "<${env.BUILD_URL}|Click to View>", short: false ]
+          ]
+        ]]
+      ]
+
+      writeJSON file: 'slack-failure.json', json: slackPayload
+      sh "curl -X POST -H 'Content-type: application/json' --data @slack-failure.json ${SLACK_WEBHOOK}"
+    }
+  }
+}
+
 }
