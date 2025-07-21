@@ -87,8 +87,6 @@ pipeline {
           if (!env.CHANGE_ID) {
             error("❌ CHANGE_ID not found. Make sure this job is triggered by a Pull Request.")
           }
-
-          // Prepare JSON payload for merge
           def mergePayload = """{
             "commit_title": "✅ Auto-merged by Jenkins",
             "merge_method": "merge"
