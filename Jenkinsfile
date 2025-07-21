@@ -11,7 +11,7 @@ pipeline {
     NODE_CACHE = '/root/.npm'
     SLACK_WEBHOOK = credentials('slack-webhook')
     GITHUB_TOKEN = credentials('github-pat')
-    REPO = 'ishan941/learn_devops_with_nest' // org/repo only, no full URL
+    REPO = 'ishan941/learn_devops_with_nest' 
   }
 
   options {
