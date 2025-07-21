@@ -10,7 +10,7 @@ pipeline {
     BRANCH_NAME = "${env.GIT_BRANCH ?: env.BRANCH_NAME}"
     NODE_CACHE = '/root/.npm'
     SLACK_WEBHOOK = credentials('slack-webhook')
-    GITHUB_TOKEN = credentials('github-token')
+    GITHUB_TOKEN = credentials('github-pat')
     REPO = 'ishan941/learn_devops_with_nest' // org/repo only, no full URL
   }
 
@@ -123,7 +123,8 @@ pipeline {
     }
   }
   post {
-    success {
+  success {
+    node {
       script {
         def author = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
         def message = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
@@ -152,8 +153,10 @@ pipeline {
         sh "curl -X POST -H 'Content-type: application/json' --data @slack-success.json '${SLACK_WEBHOOK}'"
       }
     }
+  }
 
-    failure {
+  failure {
+    node {
       script {
         def time = sh(script: "date '+%Y-%m-%d %H:%M:%S'", returnStdout: true).trim()
         def payload = """
@@ -178,4 +181,6 @@ pipeline {
       }
     }
   }
+}
+
 }
