@@ -83,23 +83,65 @@ pipeline {
     }
   }
 
-  post {
-    success {
-      script {
-        sh """
-          curl -X POST -H 'Content-type: application/json' \
-          --data '{"text": "✅ *Build Succeeded* on branch `${env.BRANCH_NAME}`\\n🔗 <${env.BUILD_URL}|View Build Log>"}' \
-          ${SLACK_WEBHOOK}
-        """
+ post {
+  success {
+    script {
+      def timestamp = new Date().format("yyyy-MM-dd HH:mm:ss", TimeZone.getTimeZone("Asia/Kathmandu"))
+      def gitCommitMessage = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
+      def gitAuthor = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
+
+      def message = """
+      {
+        "text": "✅ *Build Succeeded*",
+        "attachments": [
+          {
+            "color": "good",
+            "fields": [
+              { "title": "Job", "value": "${env.JOB_NAME}", "short": true },
+              { "title": "Build", "value": "#${env.BUILD_NUMBER}", "short": true },
+              { "title": "Branch", "value": "\`${env.BRANCH_NAME}\`", "short": true },
+              { "title": "Commit Author", "value": "${gitAuthor}", "short": true },
+              { "title": "Commit Message", "value": "${gitCommitMessage}", "short": false },
+              { "title": "Time", "value": "${timestamp}", "short": true },
+              { "title": "View Logs", "value": "<${env.BUILD_URL}|Click to View>", "short": false }
+            ]
+          }
+        ]
       }
-    }
-    failure {
-      script {
-        sh (
-        script: "curl -X POST -H 'Content-type: application/json' --data '{\"text\": \"❌ *Build Failed* on branch \\`${env.BRANCH_NAME}\\`\\n🔗 <${env.BUILD_URL}|View Build Log>\"}' ${SLACK_WEBHOOK}",
-        returnStdout: true
-        )
-      }
+      """
+      sh "curl -X POST -H 'Content-type: application/json' --data '${message.trim()}' ${SLACK_WEBHOOK}"
     }
   }
+
+  failure {
+    script {
+      def timestamp = new Date().format("yyyy-MM-dd HH:mm:ss", TimeZone.getTimeZone("Asia/Kathmandu"))
+      def gitCommitMessage = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
+      def gitAuthor = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
+
+      def message = """
+      {
+        "text": "❌ *Build Failed*",
+        "attachments": [
+          {
+            "color": "danger",
+            "fields": [
+              { "title": "Job", "value": "${env.JOB_NAME}", "short": true },
+              { "title": "Build", "value": "#${env.BUILD_NUMBER}", "short": true },
+              { "title": "Branch", "value": "\`${env.BRANCH_NAME}\`", "short": true },
+              { "title": "Commit Author", "value": "${gitAuthor}", "short": true },
+              { "title": "Commit Message", "value": "${gitCommitMessage}", "short": false },
+              { "title": "Time", "value": "${timestamp}", "short": true },
+              { "title": "View Logs", "value": "<${env.BUILD_URL}|Click to View>", "short": false }
+            ]
+          }
+        ]
+      }
+      """
+      sh "curl -X POST -H 'Content-type: application/json' --data '${message.trim()}' ${SLACK_WEBHOOK}"
+    }
+  }
+}
+
+
 }
