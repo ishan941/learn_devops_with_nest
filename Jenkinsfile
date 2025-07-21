@@ -118,6 +118,7 @@ pipeline {
       }
     }
   }
+
   post {
     success {
       script {
@@ -148,7 +149,6 @@ pipeline {
         sh "curl -X POST -H 'Content-type: application/json' --data @slack-success.json '${SLACK_WEBHOOK}'"
       }
     }
-
     failure {
       script {
         def time = sh(script: "date '+%Y-%m-%d %H:%M:%S'", returnStdout: true).trim()
