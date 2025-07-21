@@ -11,7 +11,7 @@ pipeline {
     NODE_CACHE = '/root/.npm'
     SLACK_WEBHOOK = credentials('slack-webhook')
     GITHUB_TOKEN = credentials('github-token')
-    REPO = 'ishan941/learn_devops_with_nest' // ✅ GitHub repo format
+    REPO = 'ishan941/learn_devops_with_nest' // ⚠️ just org/repo, not full URL
   }
 
   options {
@@ -36,7 +36,7 @@ pipeline {
 
     stage('Lint') {
       when {
-        anyOf { branch 'main'; branch 'develop' }
+        anyOf { branch 'main'; changeRequest() }
       }
       steps {
         dir('learnnest-student-crud') {
@@ -47,7 +47,7 @@ pipeline {
 
     stage('Test') {
       when {
-        anyOf { branch 'main'; branch 'develop' }
+        anyOf { branch 'main'; changeRequest() }
       }
       steps {
         dir('learnnest-student-crud') {
@@ -63,7 +63,7 @@ pipeline {
 
     stage('Build') {
       when {
-        branch 'main'
+        anyOf { branch 'main'; changeRequest() }
       }
       steps {
         dir('learnnest-student-crud') {
@@ -73,37 +73,29 @@ pipeline {
       }
     }
 
-    stage('Deploy') {
-      when {
-        branch 'main'
-      }
-      steps {
-        echo '🚀 Deploying to production server...'
-        // Add your real deploy script here
-      }
-    }
-
-    stage('Auto Merge develop → main') {
+    stage('Auto Merge PR') {
       when {
         allOf {
-          branch 'develop'
+          changeRequest()  // Only run this if it's a PR build
           expression { currentBuild.currentResult == 'SUCCESS' }
         }
       }
       steps {
         script {
+          echo "🔀 Attempting to auto-merge PR #${env.CHANGE_ID}"
+
           def mergePayload = """
           {
-            "base": "main",
-            "head": "develop",
-            "commit_message": "Auto merge from Jenkins"
+            "commit_title": "✅ Auto-merged by Jenkins after successful build",
+            "merge_method": "merge"
           }
           """
+
           sh """
-            curl -X POST -H "Authorization: token ${GITHUB_TOKEN}" \
+            curl -X PUT -H "Authorization: token ${GITHUB_TOKEN}" \
               -H "Accept: application/vnd.github.v3+json" \
               -d '${mergePayload}' \
-              https://api.github.com/repos/${REPO}/merges
+              https://api.github.com/repos/${REPO}/pulls/${CHANGE_ID}/merge
           """
         }
       }
@@ -137,9 +129,7 @@ pipeline {
         }
         """
         writeFile file: 'slack-success.json', text: payload
-        withEnv(["HOOK=${SLACK_WEBHOOK}"]) {
-          sh "curl -X POST -H 'Content-type: application/json' --data @slack-success.json \$HOOK"
-        }
+        sh "curl -X POST -H 'Content-type: application/json' --data @slack-success.json '${SLACK_WEBHOOK}'"
       }
     }
 
@@ -164,9 +154,7 @@ pipeline {
         }
         """
         writeFile file: 'slack-failure.json', text: payload
-        withEnv(["HOOK=${SLACK_WEBHOOK}"]) {
-          sh "curl -X POST -H 'Content-type: application/json' --data @slack-failure.json \$HOOK"
-        }
+        sh "curl -X POST -H 'Content-type: application/json' --data @slack-failure.json '${SLACK_WEBHOOK}'"
       }
     }
   }
