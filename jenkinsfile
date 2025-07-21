@@ -1,8 +1,25 @@
 pipeline {
-  agent {
-    docker {
-      image 'node:18'
-      args '-u root'  // run as root to avoid permission issues
+    agent any
+
+    tools {
+        nodejs 'NodeJS_14' // The name you gave NodeJS installation in Jenkins
     }
-  }
+
+    stages {
+        stage('Install') {
+            steps {
+                sh 'npm install'
+            }
+        }
+        stage('Build') {
+            steps {
+                sh 'npm run build'
+            }
+        }
+        stage('Test') {
+            steps {
+                sh 'npm run test'
+            }
+        }
+    }
 }
