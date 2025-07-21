@@ -83,7 +83,7 @@ pipeline {
     }
   }
 
-  post {
+   post {
     success {
       script {
         def time = new Date().format("yyyy-MM-dd HH:mm:ss", TimeZone.getTimeZone("Asia/Kathmandu"))
@@ -91,26 +91,26 @@ pipeline {
         def author = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
         def branch = env.BRANCH_NAME
 
-        def payload = """
-{
-  "text": "✅ *Build Succeeded*",
-  "attachments": [
-    {
-      "color": "good",
-      "fields": [
-        { "title": "Job", "value": "${env.JOB_NAME}", "short": true },
-        { "title": "Build", "value": "#${env.BUILD_NUMBER}", "short": true },
-        { "title": "Branch", "value": "\\`${branch}\\`", "short": true },
-        { "title": "Commit Author", "value": "${author}", "short": true },
-        { "title": "Commit Message", "value": "${commitMessage}", "short": false },
-        { "title": "Time", "value": "${time}", "short": true },
-        { "title": "View Logs", "value": "<${env.BUILD_URL}|Click to View>", "short": false }
-      ]
-    }
-  ]
-}
-"""
-        writeFile file: 'slack-success.json', text: payload
+        def slackMessage = [
+          text: "✅ *Build Succeeded*",
+          attachments: [
+            [
+              color: "good",
+              fields: [
+                [title: "Job", value: env.JOB_NAME, short: true],
+                [title: "Build", value: "#${env.BUILD_NUMBER}", short: true],
+                [title: "Branch", value: branch, short: true],
+                [title: "Commit Author", value: author, short: true],
+                [title: "Commit Message", value: commitMessage, short: false],
+                [title: "Time", value: time, short: true],
+                [title: "View Logs", value: "<${env.BUILD_URL}|Click to View>", short: false]
+              ]
+            ]
+          ]
+        ]
+
+        def payloadJson = JsonOutput.toJson(slackMessage)
+        writeFile file: 'slack-success.json', text: payloadJson
         sh "curl -X POST -H 'Content-type: application/json' --data @slack-success.json ${SLACK_WEBHOOK}"
       }
     }
@@ -122,26 +122,26 @@ pipeline {
         def author = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
         def branch = env.BRANCH_NAME
 
-        def payload = """
-{
-  "text": "❌ *Build Failed*",
-  "attachments": [
-    {
-      "color": "danger",
-      "fields": [
-        { "title": "Job", "value": "${env.JOB_NAME}", "short": true },
-        { "title": "Build", "value": "#${env.BUILD_NUMBER}", "short": true },
-        { "title": "Branch", "value": "\\`${branch}\\`", "short": true },
-        { "title": "Commit Author", "value": "${author}", "short": true },
-        { "title": "Commit Message", "value": "${commitMessage}", "short": false },
-        { "title": "Time", "value": "${time}", "short": true },
-        { "title": "View Logs", "value": "<${env.BUILD_URL}|Click to View>", "short": false }
-      ]
-    }
-  ]
-}
-"""
-        writeFile file: 'slack-failure.json', text: payload
+        def slackMessage = [
+          text: "❌ *Build Failed*",
+          attachments: [
+            [
+              color: "danger",
+              fields: [
+                [title: "Job", value: env.JOB_NAME, short: true],
+                [title: "Build", value: "#${env.BUILD_NUMBER}", short: true],
+                [title: "Branch", value: branch, short: true],
+                [title: "Commit Author", value: author, short: true],
+                [title: "Commit Message", value: commitMessage, short: false],
+                [title: "Time", value: time, short: true],
+                [title: "View Logs", value: "<${env.BUILD_URL}|Click to View>", short: false]
+              ]
+            ]
+          ]
+        ]
+
+        def payloadJson = JsonOutput.toJson(slackMessage)
+        writeFile file: 'slack-failure.json', text: payloadJson
         sh "curl -X POST -H 'Content-type: application/json' --data @slack-failure.json ${SLACK_WEBHOOK}"
       }
     }
