@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: my-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ishan!1
+      POSTGRES_DB: shared_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: my-pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ishanshrestha941@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: ishan!1
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+
+  nestjs:
+    build:
+      context: ./learnnest-student-crud
+      dockerfile: Dockerfile
+
+    container_name: learnnest-student-crud
+    restart: always
+    ports:
+      - "3001:3000"
+    depends_on:
+      - postgres
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: ishan!1
+      DB_NAME: shared_db
+
+volumes:
+  pgdata:
+  pgadmin-data:
