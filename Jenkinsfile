@@ -82,7 +82,6 @@ pipeline {
       }
       steps {
         script {
-          // DEBUG: Print environment variables for troubleshooting
           echo "🔁 CHANGE_ID (PR number) = ${env.CHANGE_ID}"
           echo "🔁 REPO = ${REPO}"
           if (!env.CHANGE_ID) {
