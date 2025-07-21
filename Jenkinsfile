@@ -73,33 +73,47 @@ pipeline {
       }
     }
 
-    stage('Auto Merge PR') {
-      when {
-        allOf {
-          changeRequest()  // Only run this if it's a PR build
-          expression { currentBuild.currentResult == 'SUCCESS' }
-        }
-      }
-      steps {
-        script {
-          echo "🔀 Attempting to auto-merge PR #${env.CHANGE_ID}"
+ stage('Auto Merge PR') {
+  when {
+    allOf {
+      changeRequest(target: 'main')
+      expression { currentBuild.currentResult == 'SUCCESS' }
+    }
+  }
+  steps {
+    script {
+      echo "🔁 CHANGE_ID = ${env.CHANGE_ID}"
+      echo "🔁 REPO = ${REPO}"
 
-          def mergePayload = """
-          {
-            "commit_title": "✅ Auto-merged by Jenkins after successful build",
-            "merge_method": "merge"
-          }
-          """
+      def mergePayload = """{
+        "commit_title": "✅ Auto-merged by Jenkins",
+        "merge_method": "merge"
+      }"""
 
-          sh """
-            curl -X PUT -H "Authorization: token ${GITHUB_TOKEN}" \
-              -H "Accept: application/vnd.github.v3+json" \
-              -d '${mergePayload}' \
-              https://api.github.com/repos/${REPO}/pulls/${CHANGE_ID}/merge
-          """
-        }
+      def response = sh(
+        script: """
+          curl -s -w "\\n%{http_code}" -X PUT \
+          -H "Authorization: token ${GITHUB_TOKEN}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -d '${mergePayload}' \
+          https://api.github.com/repos/${REPO}/pulls/${CHANGE_ID}/merge
+        """,
+        returnStdout: true
+      ).trim()
+
+      def (body, statusCode) = response.split('\n')
+      echo "GitHub API response code: ${statusCode}"
+      echo "GitHub API response body: ${body}"
+
+      if (statusCode != '200') {
+        error("❌ Auto-merge failed with status ${statusCode}")
+      } else {
+        echo "✅ Auto-merge successful"
       }
     }
+  }
+}
+
   }
 
   post {
