@@ -4,7 +4,6 @@ pipeline {
     tools {
         nodejs 'NodeJS_14'
     }
-
     stages {
         stage('Clean Workspace') {
             steps {
@@ -30,7 +29,6 @@ pipeline {
             }
         }
     }
-
     post {
         always {
             echo 'Cleaning up workspace after build'
