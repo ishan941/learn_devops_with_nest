@@ -11,7 +11,7 @@ pipeline {
     NODE_CACHE = '/root/.npm'
     SLACK_WEBHOOK = credentials('slack-webhook')
     GITHUB_TOKEN = credentials('github-token')
-    REPO = 'ishan941/learn_devops_with_nest' // ⚠️ just org/repo, not full URL
+    REPO = 'ishan941/learn_devops_with_nest' // org/repo only, no full URL
   }
 
   options {
@@ -73,47 +73,54 @@ pipeline {
       }
     }
 
- stage('Auto Merge PR') {
-  when {
-    allOf {
-      changeRequest(target: 'main')
-      expression { currentBuild.currentResult == 'SUCCESS' }
-    }
-  }
-  steps {
-    script {
-      echo "🔁 CHANGE_ID = ${env.CHANGE_ID}"
-      echo "🔁 REPO = ${REPO}"
+    stage('Auto Merge PR') {
+      when {
+        allOf {
+          changeRequest(target: 'main')   // Only PRs targeting 'main' branch
+          expression { currentBuild.currentResult == 'SUCCESS' }
+        }
+      }
+      steps {
+        script {
+          // DEBUG: Print environment variables for troubleshooting
+          echo "🔁 CHANGE_ID (PR number) = ${env.CHANGE_ID}"
+          echo "🔁 REPO = ${REPO}"
+          if (!env.CHANGE_ID) {
+            error("❌ CHANGE_ID not found. Make sure this job is triggered by a Pull Request.")
+          }
 
-      def mergePayload = """{
-        "commit_title": "✅ Auto-merged by Jenkins",
-        "merge_method": "merge"
-      }"""
+          // Prepare JSON payload for merge
+          def mergePayload = """{
+            "commit_title": "✅ Auto-merged by Jenkins",
+            "merge_method": "merge"
+          }"""
 
-      def response = sh(
-        script: """
-          curl -s -w "\\n%{http_code}" -X PUT \
-          -H "Authorization: token ${GITHUB_TOKEN}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          -d '${mergePayload}' \
-          https://api.github.com/repos/${REPO}/pulls/${CHANGE_ID}/merge
-        """,
-        returnStdout: true
-      ).trim()
+          // Call GitHub API to merge the PR
+          def response = sh(
+            script: """
+              curl -s -w "\\n%{http_code}" -X PUT \
+              -H "Authorization: token ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -d '${mergePayload}' \
+              https://api.github.com/repos/${REPO}/pulls/${CHANGE_ID}/merge
+            """,
+            returnStdout: true
+          ).trim()
 
-      def (body, statusCode) = response.split('\n')
-      echo "GitHub API response code: ${statusCode}"
-      echo "GitHub API response body: ${body}"
+          // Parse response and status code
+          def (body, statusCode) = response.tokenize('\n')[-2..-1]
 
-      if (statusCode != '200') {
-        error("❌ Auto-merge failed with status ${statusCode}")
-      } else {
-        echo "✅ Auto-merge successful"
+          echo "GitHub API response code: ${statusCode}"
+          echo "GitHub API response body: ${body}"
+
+          if (statusCode != '200') {
+            error("❌ Auto-merge failed with status ${statusCode} and message: ${body}")
+          } else {
+            echo "✅ Auto-merge successful for PR #${env.CHANGE_ID}"
+          }
+        }
       }
     }
-  }
-}
-
   }
 
   post {
