@@ -89,11 +89,11 @@ pipeline {
     }
     failure {
       script {
-        sh """
-          curl -X POST -H 'Content-type: application/json' \
-          --data '{"text": "❌ *Build Failed* on branch `${env.BRANCH_NAME}`\\n🔗 <${env.BUILD_URL}|View Build Log>"}' \
-          ${SLACK_WEBHOOK}
-        """
+        sh (
+        script: "curl -X POST -H 'Content-type: application/json' --data '{\"text\": \"❌ *Build Failed* on branch \\`${env.BRANCH_NAME}\\`\\n🔗         <${env.BUILD_URL}|View Build Log>\"}' ${SLACK_WEBHOOK}",
+        returnStdout: true
+        )
+
       }
     }
   }
