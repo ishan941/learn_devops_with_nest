@@ -2,16 +2,14 @@ pipeline {
   agent {
     docker {
       image 'node:18'
-      args '-u root'
+      args '-u root'  // run as root to avoid permission issues
     }
   }
 
   environment {
-    BRANCH_NAME = "${env.GIT_BRANCH ?: env.BRANCH_NAME}"
-    NODE_CACHE = '/root/.npm'
-    SLACK_WEBHOOK = credentials('slack-webhook')
-    GITHUB_TOKEN = credentials('github-pat')
-    REPO = 'ishan941/learn_devops_with_nest'
+    BRANCH_NAME = "${env.GIT_BRANCH ?: env.BRANCH_NAME}"  // fallback for branch
+    NODE_CACHE = '/root/.npm'  // npm cache
+    SLACK_WEBHOOK = credentials('slack-webhook') 
   }
 
   options {
@@ -20,15 +18,10 @@ pipeline {
   }
 
   stages {
-    stage('Checkout') {
-      steps {
-        checkout scm
-      }
-    }
 
     stage('Install') {
       steps {
-        dir('learnnest-student-crud') {
+        dir("${env.WORKSPACE}/learnnest-student-crud") {
           sh 'npm ci'
         }
       }
@@ -36,10 +29,13 @@ pipeline {
 
     stage('Lint') {
       when {
-        anyOf { branch 'main'; changeRequest() }
+        anyOf {
+          branch 'develop'
+          branch 'main'
+        }
       }
       steps {
-        dir('learnnest-student-crud') {
+        dir("${env.WORKSPACE}/learnnest-student-crud") {
           sh 'npm run lint || true'
         }
       }
@@ -47,10 +43,13 @@ pipeline {
 
     stage('Test') {
       when {
-        anyOf { branch 'main'; changeRequest() }
+        anyOf {
+          branch 'develop'
+          branch 'main'
+        }
       }
       steps {
-        dir('learnnest-student-crud') {
+        dir("${env.WORKSPACE}/learnnest-student-crud") {
           sh 'npm run test -- --passWithNoTests'
         }
       }
@@ -63,58 +62,23 @@ pipeline {
 
     stage('Build') {
       when {
-        anyOf { branch 'main'; changeRequest() }
+        branch 'main'
       }
       steps {
-        dir('learnnest-student-crud') {
+        dir("${env.WORKSPACE}/learnnest-student-crud") {
           sh 'npm run build'
         }
         archiveArtifacts artifacts: 'learnnest-student-crud/dist/**', fingerprint: true
       }
     }
 
-    stage('Auto Merge PR') {
+    stage('Deploy') {
       when {
-        allOf {
-          changeRequest(target: 'main')
-          expression { currentBuild.currentResult == 'SUCCESS' }
-        }
+        branch 'main'
       }
       steps {
-        script {
-          echo "🔁 CHANGE_ID (PR number) = ${env.CHANGE_ID}"
-          echo "🔁 REPO = ${REPO}"
-          if (!env.CHANGE_ID) {
-            error("❌ CHANGE_ID not found. Make sure this job is triggered by a Pull Request.")
-          }
-
-          def mergePayload = """{
-            "commit_title": "✅ Auto-merged by Jenkins",
-            "merge_method": "merge"
-          }"""
-
-          def response = sh(
-            script: """
-              curl -s -w "\\n%{http_code}" -X PUT \
-              -H "Authorization: token ${GITHUB_TOKEN}" \
-              -H "Accept: application/vnd.github.v3+json" \
-              -d '${mergePayload}' \
-              https://api.github.com/repos/${REPO}/pulls/${CHANGE_ID}/merge
-            """,
-            returnStdout: true
-          ).trim()
-
-          def (body, statusCode) = response.tokenize('\n')[-2..-1]
-
-          echo "GitHub API response code: ${statusCode}"
-          echo "GitHub API response body: ${body}"
-
-          if (statusCode != '200') {
-            error("❌ Auto-merge failed with status ${statusCode} and message: ${body}")
-          } else {
-            echo "✅ Auto-merge successful for PR #${env.CHANGE_ID}"
-          }
-        }
+        echo '🚀 Deploying to production server...'
+        // Add your deploy script here
       }
     }
   }
@@ -122,55 +86,19 @@ pipeline {
   post {
     success {
       script {
-        def author = sh(script: "git log -1 --pretty=%an", returnStdout: true).trim()
-        def message = sh(script: "git log -1 --pretty=%B", returnStdout: true).trim()
-        def time = sh(script: "date '+%Y-%m-%d %H:%M:%S'", returnStdout: true).trim()
-
-        def payload = """
-        {
-          "text": "✅ *Build Succeeded*",
-          "attachments": [
-            {
-              "color": "good",
-              "fields": [
-                { "title": "Job", "value": "${env.JOB_NAME}", "short": true },
-                { "title": "Build", "value": "#${env.BUILD_NUMBER}", "short": true },
-                { "title": "Branch", "value": "${env.BRANCH_NAME}", "short": true },
-                { "title": "Commit Author", "value": "${author}", "short": true },
-                { "title": "Commit Message", "value": "${message}", "short": false },
-                { "title": "Time", "value": "${time}", "short": true },
-                { "title": "View Logs", "value": "<${env.BUILD_URL}|Click to View>", "short": false }
-              ]
-            }
-          ]
-        }
+        sh """
+          curl -X POST -H 'Content-type: application/json' \
+          --data '{"text": "✅ *Build Succeeded* on branch `${env.BRANCH_NAME}`\\n🔗 <${env.BUILD_URL}|View Build Log>"}' \
+          ${SLACK_WEBHOOK}
         """
-        writeFile file: 'slack-success.json', text: payload
-        sh "curl -X POST -H 'Content-type: application/json' --data @slack-success.json '${SLACK_WEBHOOK}'"
       }
     }
     failure {
       script {
-        def time = sh(script: "date '+%Y-%m-%d %H:%M:%S'", returnStdout: true).trim()
-        def payload = """
-        {
-          "text": "❌ *Build Failed*",
-          "attachments": [
-            {
-              "color": "danger",
-              "fields": [
-                { "title": "Job", "value": "${env.JOB_NAME}", "short": true },
-                { "title": "Build", "value": "#${env.BUILD_NUMBER}", "short": true },
-                { "title": "Branch", "value": "${env.BRANCH_NAME}", "short": true },
-                { "title": "Time", "value": "${time}", "short": true },
-                { "title": "View Logs", "value": "<${env.BUILD_URL}|Click to View>", "short": false }
-              ]
-            }
-          ]
-        }
-        """
-        writeFile file: 'slack-failure.json', text: payload
-        sh "curl -X POST -H 'Content-type: application/json' --data @slack-failure.json '${SLACK_WEBHOOK}'"
+        sh (
+        script: "curl -X POST -H 'Content-type: application/json' --data '{\"text\": \"❌ *Build Failed* on branch \\`${env.BRANCH_NAME}\\`\\n🔗 <${env.BUILD_URL}|View Build Log>\"}' ${SLACK_WEBHOOK}",
+        returnStdout: true
+        )
       }
     }
   }
